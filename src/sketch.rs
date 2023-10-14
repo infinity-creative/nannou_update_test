@@ -34,6 +34,15 @@ fn update(app: &App, model: &mut Model, update: Update) {
             DESIGN_WIDTH,
         );
 
+        model.layout = Some(
+            generate_layout(
+                app.window_rect(),
+                model.settings.page_padding,
+                model.settings.row_total,
+                model.settings.col_total,
+                model.settings.gap,
+            )
+        );
     }
 
     if model.e_gui.is_some() {
@@ -42,6 +51,7 @@ fn update(app: &App, model: &mut Model, update: Update) {
 
         egui.set_elapsed_time(update.since_start);
         let ctx = egui.begin_frame();
+
 
         egui::Window::new("Settings").show(&ctx, |ui| {
             ui.label("Debug");
@@ -54,29 +64,37 @@ fn update(app: &App, model: &mut Model, update: Update) {
                     &mut setttings.page_padding, 0..=100,
                 ).text("Page Padding")
             );
-            ui.add(
+
+            if ui.add(
                 egui::Slider::new(
                     &mut setttings.row_total, 0..=30,
                 ).text("Rows Total")
-            );
-            ui.add(
+            ).changed() {
+                model.is_setup = false;
+            }
+
+
+            if ui.add(
                 egui::Slider::new(
                     &mut setttings.col_total, 0..=30,
                 ).text("Cols Total")
-            );
+            ).changed() {
+                model.is_setup = false;
+            }
+
+            if ui.add(
+                egui::Slider::new(
+                    &mut setttings.gap, 0..=30,
+                ).text("Gap")
+            ).changed() {
+                model.is_setup = false;
+            }
+
+
+
+
         });
     }
-
-
-    model.layout = Some(
-        generate_layout(
-            app.window_rect(),
-            model.settings.page_padding,
-            model.settings.row_total,
-            model.settings.col_total,
-        )
-    );
-
 }
 
 
@@ -85,12 +103,14 @@ fn generate_layout(
     page_padding: i32,
     rows: i32,
     cols: i32,
+    gap: i32,
 ) -> Vec<Vec<LayoutItem>> {
+
     let r = Rect::from_xy_wh(
         win_rect.xy(),
-        win_rect.wh()
-    );
-    r.pad(page_padding.to_f32().unwrap());
+        win_rect.wh(),
+    ).pad(page_padding.to_f32().unwrap());
+
 
     let mut layout = vec![];
 
@@ -100,6 +120,7 @@ fn generate_layout(
 
     let mut y = r.bottom() + row_h / 2.0;
 
+    // generate items ---------------------------------------------------
     for _ in 0..rows {
         let row_rect = Rect::from_xy_wh(
             pt2(0.0, 0.0),
@@ -109,21 +130,98 @@ fn generate_layout(
         let mut x = row_rect.left() + col_w / 2.0;
         let mut row_items = vec![];
 
+        // gen shapes we want
         for _ in 0..cols {
             row_items.push(
                 LayoutItem {
-                    shape: Shapes::Square,
+                    shape: get_rnd_shape(),
                     dimensions: Rect::from_xy_wh(
                         pt2(x, y),
                         pt2(col_w, row_h),
-                    ).pad(2.0),
+                    ),
                 }
             );
 
             x = x + col_w;
         }
 
-        layout.push(row_items);
+        let mut new_row_items = vec![];
+        let mut new_layout_item: Option<LayoutItem> = None;
+        //.pad(gap.to_f32().unwrap())
+
+        // join the squares together ------------------------------------------------
+        for x_item in row_items {
+            if x_item.shape == Shapes::Square {
+                if new_layout_item.is_none() {
+                    new_layout_item = Some(
+                        LayoutItem {
+                            shape: x_item.shape,
+                            dimensions: x_item.dimensions,
+                        }
+                    );
+                } else {
+                    // we have one already streatch out
+                    let t_item = new_layout_item.unwrap();
+                    let w1 = t_item.dimensions.w();
+                    let r = t_item.dimensions.right();
+                    let new_r = t_item.dimensions
+                        .stretch_to_point(
+                            [
+                                x_item.dimensions.right(),
+                                x_item.dimensions.top(),
+                            ],
+                        );
+
+                    let df = LayoutItem {
+                        shape: x_item.shape,
+                        dimensions: Rect::from_xy_wh(new_r.xy(), new_r.wh()),
+                    };
+
+                    new_layout_item = Some(df);
+                }
+            } else {
+                // where we just working with a square
+
+                if new_layout_item.is_some() {
+                    new_row_items.push(
+                        new_layout_item.unwrap().clone()
+                    );
+                }
+                new_layout_item = None;
+
+                new_layout_item = Some(
+                    LayoutItem {
+                        shape: x_item.shape,
+                        dimensions: x_item.dimensions,
+                    }
+                );
+
+                new_row_items.push(
+                    new_layout_item.unwrap().clone()
+                );
+                new_layout_item = None;
+            }
+        }
+        if (new_layout_item.is_some()) {
+            new_row_items.push(
+                new_layout_item.unwrap().clone()
+            );
+        }
+
+
+        // add padding
+        let mut padded_row = vec![];
+        for non_padded in new_row_items {
+            let d = non_padded.dimensions.pad(gap.to_f32().unwrap());
+            padded_row.push(
+                LayoutItem{
+                    shape: non_padded.shape,
+                    dimensions: d,
+                }
+            )
+        }
+
+        layout.push(padded_row);
         y = y + row_h;
     }
 
@@ -197,6 +295,7 @@ fn generate_layout(
 //     layout
 // }
 
+
 fn get_rnd_shape() -> Shapes {
     let s: Shapes;
     match random_range(0, 5) {
@@ -227,30 +326,11 @@ fn view(app: &App, model: &Model, frame: nannou::Frame) {
     for row in layouts {
         for item in row {
             draw.rect()
-                .color(gray(random_f32()))
+                .color(gray(0.8))
                 .xy(item.dimensions.xy())
                 .wh(item.dimensions.wh());
         }
     }
-
-
-    // draw.rect()
-    //     .color(gray(0.5))
-    //     .x_y(0.0, 0.0)
-    //     .w_h(300.0, 300.0);
-
-    // bg rect to see spacer
-    // draw.rect()
-    //     .x(0.0)
-    //     .y(200.0)
-    //     .w(2000.0)
-    //     .h(100.0)
-    //
-    //     .color(gray(0.3));
-
-    // draw grid helpers
-    // draw.background().color(gray(0.9));
-
 
     if model.settings.show_grid {
         carbon_sketch_helpers::draw_grid(&draw, &win_rect, 20.0, 1.0);

@@ -3,7 +3,7 @@ use nannou::geom::Rect;
 use nannou::prelude::ToPrimitive;
 use nannou_egui::Egui;
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone)]
 pub enum Shapes {
     Square,
     Circle,
@@ -17,8 +17,10 @@ pub struct Settings {
     pub page_padding: i32,
     pub col_total: i32,
     pub row_total: i32,
+    pub gap: i32,
 }
 
+#[derive(Clone)]
 pub struct LayoutItem {
     pub shape: Shapes,
     pub dimensions: Rect,
@@ -55,8 +57,9 @@ impl Model {
                 show_grid: true,
 
                 page_padding: 30,
-                col_total: 5,
-                row_total: 5,
+                col_total: 14,
+                row_total: 15,
+                gap:1,
             },
 
             // will be setup on first update call
