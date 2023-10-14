@@ -1,6 +1,6 @@
 # You must change these to your own details.
 [package]
-name = "nannou_web_template"
+name = "nn_001"
 description = "template repository to run nannou app both in native app and web browser."
 version = "0.0.1"
 authors = ["You <you@example.com>"]
@@ -10,11 +10,11 @@ edition = "2021"
 resolver = "2" 
 
 [[bin]]
-name = "nannou_web_compat"
+name = "nn_001_compat"
 path = "src/main.rs"
 
 [lib]
-name = "nannou_web_test"
+name = "nn_001_web_test"
 path = "src/lib.rs"
 crate-type = ["cdylib"]
 
@@ -29,10 +29,10 @@ lto = true
 wasm-bindgen = "0.2.83"
 wasm-bindgen-futures = "0.4.32"
 async-std = { version = "1.10.0", features = ["unstable"] }
-nannou = { version="0.18.1", path="../nannou/nannou" , features =["wasm-experimental"]}
+nannou = { version="0.18.1", path="../../nannou/nannou" , features =["wasm-experimental"]}
 roughr = "0.6.0"
 points_on_curve = "0.5.0"
-nannou_egui = {version= "0.5.0", path = "../nannou/nannou_egui"}
+nannou_egui = {version= "0.5.0", path = "../../nannou/nannou_egui"}
 palette = "0.7.3"
 rand = "0.8.5"
 

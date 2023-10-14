@@ -3,14 +3,15 @@
 
 
 use async_std::task::block_on;
-use sketch::{Model, run_app};
+use sketch::{run_app};
 
 mod sketch;
+mod carbon;
+mod sketch_model;
 
 fn main() {
 
-    let model = Model {
-    };
+    let model = sketch_model::Model::new();
 
     block_on(async {
         run_app(model).await;
