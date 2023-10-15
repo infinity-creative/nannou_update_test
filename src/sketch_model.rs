@@ -2,6 +2,9 @@ use nannou::{App, Frame, wgpu};
 use nannou::geom::Rect;
 use nannou::prelude::ToPrimitive;
 use nannou_egui::Egui;
+use roughr::core::Op;
+
+use crate::carbon;
 
 #[derive(PartialEq, Clone)]
 pub enum Shapes {
@@ -43,29 +46,33 @@ pub struct HigResWorker {
 
 pub struct Model {
     pub is_setup: bool,
+    pub render_complete: bool,
     pub settings: Settings,
     pub e_gui: Option<Egui>,
     pub high_res_worker: Option<HigResWorker>,
     pub layout: Option<Vec<Vec<LayoutItem>>>,
+    pub raw_palette: Option<[String; 5]>,
 }
 
 impl Model {
     pub fn new() -> Model {
         Model {
             is_setup: false,
+            render_complete: false,
             settings: Settings {
                 show_grid: true,
 
                 page_padding: 30,
                 col_total: 14,
-                row_total: 15,
-                gap:1,
+                row_total: 20,
+                gap: 1,
             },
 
             // will be setup on first update call
             e_gui: None,
             high_res_worker: None,
             layout: None,
+            raw_palette: None,
         }
     }
 
@@ -89,6 +96,10 @@ impl Model {
             );
             self.e_gui = Some(egui);
         }
+
+        self.raw_palette = Some(
+            carbon::carbon_colors::get_random_palette()
+        );
 
         // mark the model as ready to go
         self.is_setup = true;

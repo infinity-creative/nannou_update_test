@@ -1,17 +1,17 @@
 use std::cell::RefCell;
+use nannou::noise::utils::Color;
 
-use palette::Srgba;
-use nannou::color::rgb_u32;
 
-use nannou::image::flat::View;
 use nannou::prelude::*;
 use nannou::wgpu::{Backends, BufferView, DeviceDescriptor, Limits};
 use nannou_egui::{Egui, egui};
 use nannou_egui::egui::Shape;
+use palette::IntoColor;
 use points_on_curve::points_on_bezier_curves;
 use rand::rngs::StdRng;
 use roughr::core::{Drawable, OpSetType, OpType, OptionsBuilder, FillStyle};
 use roughr::generator::Generator;
+use roughr::Srgba;
 use roughr::Point2D;
 
 use crate::sketch_model::{HigResWorker, LayoutItem, Model, Shapes};
@@ -89,10 +89,6 @@ fn update(app: &App, model: &mut Model, update: Update) {
             ).changed() {
                 model.is_setup = false;
             }
-
-
-
-
         });
     }
 }
@@ -105,7 +101,6 @@ fn generate_layout(
     cols: i32,
     gap: i32,
 ) -> Vec<Vec<LayoutItem>> {
-
     let r = Rect::from_xy_wh(
         win_rect.xy(),
         win_rect.wh(),
@@ -214,7 +209,7 @@ fn generate_layout(
         for non_padded in new_row_items {
             let d = non_padded.dimensions.pad(gap.to_f32().unwrap());
             padded_row.push(
-                LayoutItem{
+                LayoutItem {
                     shape: non_padded.shape,
                     dimensions: d,
                 }
@@ -229,76 +224,9 @@ fn generate_layout(
 }
 
 
-// fn generate_layout(
-//     win_rect: Rect,
-//     page_padding: i32,
-//     rows: i32,
-//     cols: i32,
-// ) -> Vec<Vec<LayoutItem>> {
-//     let r = Rect::from_xy_wh(win_rect.xy(), win_rect.wh());
-//     r.pad(page_padding.to_f32().unwrap());
-//
-//     let col_w = r.w() / cols.to_f32().unwrap();
-//     let row_h = r.h() / rows.to_f32().unwrap();
-//
-//     let mut x = r.x() - win_rect.w()/2.0;
-//     let mut y = r.y() - win_rect.h()/2.0;
-//
-//     let mut layout = vec![];
-//
-//     for _ in 0..rows {
-//         let mut layout_row = vec![];
-//
-//         let mut col_count = 0;
-//
-//         while col_count < cols  {
-//
-//             let s = get_rnd_shape();
-//
-//             let mut size = 1.0;
-//             if s == Shapes::Square {
-//                 let mut last_s = Shapes::Square;
-//                 while last_s == Shapes::Square && col_count < cols {
-//                     last_s = get_rnd_shape();
-//                     if last_s == Shapes::Square {
-//                         size += 1.0;
-//                     }
-//                     col_count += 1;
-//                 }
-//             } else {
-//                 col_count += 1;
-//             }
-//
-//             let current_rect = Rect::from_x_y_w_h(
-//                 x,
-//                 y,
-//                 col_w * size,
-//                 row_h,
-//             );
-//
-//             current_rect.pad(5.0);
-//
-//             layout_row.push(LayoutItem {
-//                 shape: s,
-//                 dimensions: current_rect,
-//             });
-//
-//             x = x + (col_w * size);
-//         }
-//
-//         x = r.x() - win_rect.w()/2.0;
-//         y = y + row_h;
-//
-//         layout.push(layout_row);
-//     }
-//
-//     layout
-// }
-
-
 fn get_rnd_shape() -> Shapes {
     let s: Shapes;
-    match random_range(0, 5) {
+    match random_range(0, 10) {
         0 => s = Shapes::Circle,
         1 => s = Shapes::Triangle,
         _ => s = Shapes::Square,
@@ -309,6 +237,10 @@ fn get_rnd_shape() -> Shapes {
 fn view(app: &App, model: &Model, frame: nannou::Frame) {
     if !model.is_setup {
         return; // not ready exit
+    }
+
+    if model.render_complete {
+        return;
     }
 
     // get the working drawing object
@@ -322,13 +254,119 @@ fn view(app: &App, model: &Model, frame: nannou::Frame) {
     let draw = app.draw();
     draw.background().color(WHITE);
 
+    let mut c = 0;
     let layouts = model.layout.as_ref().unwrap();
     for row in layouts {
         for item in row {
-            draw.rect()
-                .color(gray(0.8))
-                .xy(item.dimensions.xy())
-                .wh(item.dimensions.wh());
+            // draw.rect()
+            //     .color(gray(0.8))
+            //     .xy(item.dimensions.xy())
+            //     .wh(item.dimensions.wh());
+
+            let p = model.raw_palette.as_ref().unwrap();
+            let r = random_range(0, 5);
+            let fill_color = p[r].clone();
+
+            let parse_color = fill_color.parse::<csscolorparser::Color>().unwrap();
+
+            let sc = Srgba::from_components((
+                parse_color.r,
+                parse_color.g,
+                parse_color.b,
+                parse_color.a)
+            );
+
+            let mut fill_style = FillStyle::ZigZag;
+
+
+            match random_range(0,5) {
+
+                0 => fill_style = FillStyle::Dashed,
+                1 => fill_style = FillStyle::Dots,
+                2 => fill_style = FillStyle::Hachure,
+                3 => fill_style = FillStyle::CrossHatch,
+                4 => fill_style = FillStyle::ZigZagLine,
+                _ => fill_style = FillStyle::ZigZag,
+            }
+
+            let options = OptionsBuilder::default()
+                .seed(c * 1000)
+                .fill(sc.into_format())
+                .fill_style(fill_style.clone())
+
+                // .stroke()
+                // .curve_tightness(settings.curve_tightness)
+                // .curve_fitting(settings.curve_fitting)
+                // .bowing(settings.bowing)
+                // .max_randomness_offset(settings.max_ran)
+                // .roughness(settings.roughness)
+
+                .build()
+                .unwrap();
+
+            let g = Generator::default();
+
+            let draw_item: Drawable<f32>;
+
+            match item.shape {
+                Shapes::Square => {
+                    draw_item = g.rectangle::<f32>(
+                        item.dimensions.x() - (item.dimensions.w() / 2.0),
+                        item.dimensions.y() - (item.dimensions.h() / 2.0),
+                        item.dimensions.w(),
+                        item.dimensions.h(),
+                        &Some(options.clone()),
+                    );
+                }
+
+                Shapes::Circle => {
+                    draw_item = g.ellipse::<f32>(
+                        item.dimensions.x(),
+                        item.dimensions.y(),
+                        item.dimensions.w(),
+                        item.dimensions.h(),
+                        &Some(options.clone()),
+                    );
+                }
+
+                Shapes::Triangle => {
+                    let top = Point2D::new(
+                        item.dimensions.x(),
+                        item.dimensions.y() + (item.dimensions.h() / 2.0),
+                    );
+
+                    let left = Point2D::new(
+                        item.dimensions.x() - (item.dimensions.w() / 2.0),
+                        item.dimensions.y() - (item.dimensions.h() / 2.0),
+                    );
+
+
+                    let right = Point2D::new(
+                        item.dimensions.x() + (item.dimensions.w() / 2.0),
+                        item.dimensions.y() - (item.dimensions.h() / 2.0),
+                    );
+
+                    draw_item = g.polygon::<f32>(
+                        &[top, left, right],
+                        &Some(options.clone()),
+                    );
+                }
+
+                _ => {
+                    draw_item = g.rectangle::<f32>(
+                        item.dimensions.x() - (item.dimensions.w() / 2.0),
+                        item.dimensions.y() - (item.dimensions.h() / 2.0),
+                        item.dimensions.w(),
+                        item.dimensions.h(),
+                        &Some(options.clone()),
+                    );
+                }
+            }
+
+            sketch_lines(&draw, &draw_item);
+
+
+            c = c + 1;
         }
     }
 
@@ -343,6 +381,8 @@ fn view(app: &App, model: &Model, frame: nannou::Frame) {
         model.e_gui.as_ref().unwrap()
             .draw_to_frame(&frame).unwrap();
     }
+
+
 }
 
 
@@ -377,6 +417,167 @@ async fn create_window(app: &App) {
         .await
         .unwrap();
 }
+
+
+fn sketch_lines(draw: &Draw, lp: &Drawable<f32>) {
+    for set in lp.sets.iter() {
+        if set.op_set_type == OpSetType::Path {
+            let working_set = set.clone();
+            // println!("{:?}", working_set);
+
+            let mut points = Vec::new();
+
+            // let mut start_pont = pt2(0.0, 0.0);
+
+            for item in working_set.ops {
+                match item.op {
+                    OpType::Move => {
+
+                        // if we are about to move - draw the points
+                        if !points.is_empty() {
+                            draw.polyline()
+                                .color(gray(0.7))
+                                .points(points.clone());
+                            points.clear();
+                        }
+
+                        points.push(pt2(
+                            item.data[0].to_f32().unwrap(),
+                            item.data[1].to_f32().unwrap(),
+                        ));
+                    }
+                    OpType::LineTo => {
+                        points.push(pt2(
+                            item.data[0].to_f32().unwrap(),
+                            item.data[1].to_f32().unwrap(),
+                        ));
+                    }
+                    OpType::BCurveTo => {
+                        let mut curve_points = Vec::new();
+                        let last_point = points.last().clone().unwrap();
+                        curve_points.push(Point2D::new(
+                            last_point.x,
+                            last_point.y,
+                        ));
+
+                        curve_points.push(Point2D::new(
+                            item.data[0].to_f32().unwrap(),
+                            item.data[1].to_f32().unwrap(),
+                        ));
+
+                        curve_points.push(Point2D::new(
+                            item.data[2].to_f32().unwrap(),
+                            item.data[3].to_f32().unwrap(),
+                        ));
+
+                        curve_points.push(Point2D::new(
+                            item.data[4].to_f32().unwrap(),
+                            item.data[5].to_f32().unwrap(),
+                        ));
+
+                        let result_015 = points_on_bezier_curves(&curve_points, 0.2, Some(0.01));
+
+                        for p in result_015 {
+                            points.push(pt2(p.x, p.y))
+                        }
+                    }
+                }
+            }
+
+            draw.polyline()
+                .color(gray(0.7))
+                .points(points.clone());
+            points.clear();
+        }
+
+        if set.op_set_type == OpSetType::FillSketch {
+            let working_set = set.clone();
+            // println!("{:?}", working_set);
+
+            let sb_fill = lp.options.fill.unwrap();
+
+
+            let mut points = Vec::new();
+
+            // let mut start_pont = pt2(0.0, 0.0);
+
+            for item in working_set.ops {
+                match item.op {
+                    OpType::Move => {
+
+                        // if we are about to move - draw the points
+                        if !points.is_empty() {
+                            draw.polyline()
+                                .weight(2.0)
+                                .color(
+                                    srgba(sb_fill.red, sb_fill.green, sb_fill.blue, sb_fill.alpha)
+                                )
+                                .points(points.clone());
+                            points.clear();
+                        }
+
+                        points.push(pt2(
+                            item.data[0].to_f32().unwrap(),
+                            item.data[1].to_f32().unwrap(),
+                        ));
+                    }
+                    OpType::LineTo => {
+                        points.push(pt2(
+                            item.data[0].to_f32().unwrap(),
+                            item.data[1].to_f32().unwrap(),
+                        ));
+                    }
+                    OpType::BCurveTo => {
+                        let mut curve_points = Vec::new();
+                        let last_point = points.last().clone().unwrap();
+                        curve_points.push(Point2D::new(
+                            last_point.x,
+                            last_point.y,
+                        ));
+
+                        curve_points.push(Point2D::new(
+                            item.data[0].to_f32().unwrap(),
+                            item.data[1].to_f32().unwrap(),
+                        ));
+
+                        curve_points.push(Point2D::new(
+                            item.data[2].to_f32().unwrap(),
+                            item.data[3].to_f32().unwrap(),
+                        ));
+
+                        curve_points.push(Point2D::new(
+                            item.data[4].to_f32().unwrap(),
+                            item.data[5].to_f32().unwrap(),
+                        ));
+
+                        let result_015 = points_on_bezier_curves(&curve_points, 0.2, Some(0.01));
+
+                        for p in result_015 {
+                            points.push(pt2(p.x, p.y))
+                        }
+                    }
+                }
+            }
+
+
+            draw.polyline()
+                .weight(2.0)
+                .color(
+                    srgba(sb_fill.red, sb_fill.green, sb_fill.blue, sb_fill.alpha)
+                )
+                .points(points.clone());
+            points.clear();
+        }
+
+        if set.op_set_type == OpSetType::FillPath {
+            let working_set = set.clone();
+            println!("{:?}", working_set);
+
+            // let mut points = Vec::new();
+        }
+    }
+}
+
 
 fn raw_window_event(_app: &App, model: &mut Model, event: &nannou::winit::event::WindowEvent) {
     if model.e_gui.is_some() {
